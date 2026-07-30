@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="brand" x1="96" y1="96" x2="416" y2="416" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#25D7E8"/>
+      <stop offset="0.52" stop-color="#7B5CFF"/>
+      <stop offset="1" stop-color="#D94DFF"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="#101620"/>
+  <g fill="none" stroke="url(#brand)" stroke-width="28">
+    <ellipse cx="256" cy="256" rx="158" ry="70" transform="rotate(31 256 256)"/>
+    <ellipse cx="256" cy="256" rx="158" ry="70" transform="rotate(-31 256 256)"/>
+  </g>
+  <circle cx="256" cy="256" r="30" fill="#F5F7FB"/>
+</svg>

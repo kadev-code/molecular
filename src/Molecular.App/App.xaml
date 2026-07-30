@@ -1,0 +1,28 @@
+﻿<Application x:Class="Molecular.App.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:Molecular.App"
+             ShutdownMode="OnExplicitShutdown"
+             Startup="Application_Startup"
+             DispatcherUnhandledException="Application_DispatcherUnhandledException">
+    <Application.Resources>
+        <Style TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="Segoe UI Variable Text" />
+            <Setter Property="FontWeight" Value="Medium" />
+            <Setter Property="TextOptions.TextFormattingMode" Value="Ideal" />
+            <Setter Property="TextOptions.TextRenderingMode" Value="Grayscale" />
+            <Setter Property="TextOptions.TextHintingMode" Value="Animated" />
+        </Style>
+        <Style TargetType="ToolTip">
+            <Setter Property="FontFamily" Value="Segoe UI Variable Text" />
+            <Setter Property="Background" Value="#20242E" />
+            <Setter Property="Foreground" Value="#F4F5FA" />
+            <Setter Property="BorderBrush" Value="#343A47" />
+            <Setter Property="ToolTipService.InitialShowDelay" Value="650" />
+            <Setter Property="ToolTipService.BetweenShowDelay" Value="250" />
+            <Setter Property="ToolTipService.ShowDuration" Value="2400" />
+            <Setter Property="ToolTipService.HorizontalOffset" Value="10" />
+            <Setter Property="ToolTipService.VerticalOffset" Value="10" />
+        </Style>
+    </Application.Resources>
+</Application>

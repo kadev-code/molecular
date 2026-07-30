@@ -1,0 +1,30 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <AssemblyName>Molecular</AssemblyName>
+    <OutputPath>..\..\build\</OutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\Molecular.ico</ApplicationIcon>
+    <NoWarn>$(NoWarn);WFAC010</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Molecular.Core\Molecular.Core.csproj" />
+    <Resource Include="Assets\Molecular.ico" />
+    <Resource Include="Assets\Molecular.png" />
+  </ItemGroup>
+
+  <!-- O app publicado permanece sempre em build\Molecular.exe. -->
+  <Target Name="RemoveIntermediateAppHost" AfterTargets="Build">
+    <Delete Files="$(IntermediateOutputPath)apphost.exe" />
+  </Target>
+
+</Project>
