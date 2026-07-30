@@ -20,8 +20,18 @@ try {
     dotnet restore $projectPath -r win-x64
     if ($LASTEXITCODE -ne 0) { throw 'Falha ao restaurar as dependências.' }
 
-    dotnet publish $projectPath -c Release -r win-x64 --self-contained true --no-restore `
-        -p:PublishProfile=Portable-win-x64 -p:OutputPath="$intermediateBuildDirectory\" -o $publishDirectory
+    $publishArguments = @(
+        'publish',
+        $projectPath,
+        '-c', 'Release',
+        '-r', 'win-x64',
+        '--self-contained', 'true',
+        '--no-restore',
+        '-p:PublishProfile=Portable-win-x64',
+        "-p:OutputPath=$intermediateBuildDirectory",
+        '-o', $publishDirectory
+    )
+    & dotnet @publishArguments
     if ($LASTEXITCODE -ne 0) { throw 'Falha ao publicar o executável portátil.' }
 
     $executables = @(Get-ChildItem -LiteralPath $publishDirectory -File -Filter '*.exe')
