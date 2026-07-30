@@ -12,7 +12,8 @@ var tests = new (string Name, Action Run)[]
     ("respeita teto de seguranca", RespectsSafetyCeiling),
     ("monitora sessoes do Windows sem reenummerar", ReadsCachedWindowsSessions),
     ("remove e restaura canal sem perder estado", RemovesAndRestoresChannel),
-    ("impede uma segunda instancia", RejectsSecondInstance)
+    ("impede uma segunda instancia", RejectsSecondInstance),
+    ("remove teto individual oculto", RemovesLegacyHiddenCeiling)
 };
 
 var failures = new List<string>();
@@ -48,7 +49,7 @@ static void MigratesFixedProfile()
     """);
 
     var profile = new ProfileStore(temporary.Path).Load();
-    Equal(7, profile.SchemaVersion, "schema");
+    Equal(8, profile.SchemaVersion, "schema");
     Equal(2, profile.Channels.Count, "quantidade de canais");
     Equal("edge", profile.Channels[0].ApplicationKey, "primeira atribuicao");
     Equal(1, profile.Channels[0].Index, "primeiro indice");
@@ -122,6 +123,25 @@ static void RejectsSecondInstance()
         True(!SingleInstanceCoordinator.TryAcquire(id, out var second), "segunda instancia deve ser rejeitada");
         True(second is null, "segunda instancia nao deve manter recursos");
     }
+}
+
+static void RemovesLegacyHiddenCeiling()
+{
+    using var temporary = new TemporaryProfile();
+    File.WriteAllText(temporary.Path, """
+    {
+      "SchemaVersion": 7,
+      "Name": "Principal",
+      "Safety": { "Enabled": true, "GlobalCeiling": 100 },
+      "Channels": [
+        { "Index": 1, "Order": 1, "ApplicationKey": "game", "ApplicationName": "Game", "Ceiling": 50, "TargetVolume": 50 }
+      ]
+    }
+    """);
+
+    var profile = new ProfileStore(temporary.Path).Load();
+    Equal(8, profile.SchemaVersion, "schema migrado");
+    Equal(100d, profile.Channels.Single().Ceiling, "teto oculto deve ser removido");
 }
 
 static void ReadsCachedWindowsSessions()

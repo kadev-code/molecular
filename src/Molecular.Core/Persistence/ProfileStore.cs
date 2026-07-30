@@ -133,6 +133,16 @@ public sealed class ProfileStore
             profile.SchemaVersion = 7;
         }
 
+        // Version 8 removes the legacy per-channel ceiling. It was never exposed
+        // in the interface, so a saved value of 50% could silently prevent the
+        // user from reaching the visible global ceiling.
+        if (profile.SchemaVersion < 8)
+        {
+            foreach (var channel in profile.Channels)
+                channel.Ceiling = 100;
+            profile.SchemaVersion = 8;
+        }
+
         NormalizeChannels(profile);
         return profile;
     }

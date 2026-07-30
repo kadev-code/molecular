@@ -12,6 +12,8 @@ if (-not $buildDirectory.StartsWith($expectedBuildDirectory, [System.StringCompa
 }
 
 $stagingDirectory = Join-Path ([System.IO.Path]::GetTempPath()) ("molecular-portable-" + [System.Guid]::NewGuid().ToString('N'))
+$intermediateBuildDirectory = Join-Path $stagingDirectory 'build'
+$publishDirectory = Join-Path $stagingDirectory 'publish'
 [System.IO.Directory]::CreateDirectory($stagingDirectory) | Out-Null
 
 try {
@@ -19,10 +21,10 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Falha ao restaurar as dependências.' }
 
     dotnet publish $projectPath -c Release -r win-x64 --self-contained true --no-restore `
-        -p:PublishProfile=Portable-win-x64 -o $stagingDirectory
+        -p:PublishProfile=Portable-win-x64 -p:OutputPath="$intermediateBuildDirectory\" -o $publishDirectory
     if ($LASTEXITCODE -ne 0) { throw 'Falha ao publicar o executável portátil.' }
 
-    $executables = @(Get-ChildItem -LiteralPath $stagingDirectory -File -Filter '*.exe')
+    $executables = @(Get-ChildItem -LiteralPath $publishDirectory -File -Filter '*.exe')
     if ($executables.Count -ne 1 -or $executables[0].Name -ne 'Molecular.exe') {
         throw "A publicação deveria produzir somente Molecular.exe, mas encontrou $($executables.Count) executável(is)."
     }
@@ -45,6 +47,10 @@ try {
     Write-Host "SHA-256: $($hash.Hash)"
 }
 finally {
+    $intermediateHost = Join-Path $repositoryRoot 'src\Molecular.App\obj\Release\singlefilehost.exe'
+    if (Test-Path -LiteralPath $intermediateHost) {
+        Remove-Item -LiteralPath $intermediateHost -Force
+    }
     if (Test-Path -LiteralPath $stagingDirectory) {
         Remove-Item -LiteralPath $stagingDirectory -Recurse -Force
     }

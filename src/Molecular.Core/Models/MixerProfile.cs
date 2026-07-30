@@ -2,7 +2,7 @@ namespace Molecular.Core.Models;
 
 public sealed class MixerProfile
 {
-    public int SchemaVersion { get; set; } = 7;
+    public int SchemaVersion { get; set; } = 8;
     public string Name { get; set; } = "Principal";
     public SafetyPolicy Safety { get; set; } = new();
     public List<ChannelBinding> Channels { get; set; } = [];

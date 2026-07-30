@@ -232,7 +232,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
             {
                 var binding = _profile.Channels.FirstOrDefault(channel =>
                     string.Equals(channel.ApplicationKey, snapshot.Key, StringComparison.OrdinalIgnoreCase));
-                var safeVolume = _safety.SafeInitialVolume(binding?.TargetVolume, binding?.Ceiling);
+                var safeVolume = _safety.SafeInitialVolume(binding?.TargetVolume);
                 if (snapshot.Volume > safeVolume || binding is not null)
                     changes.Add(new AudioSessionChange(snapshot.Key, VolumePercent: safeVolume));
             }
@@ -551,7 +551,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         var channel = new ChannelViewModel(binding, Applications, OnChannelChanged, OnViewModeChanged, OnMediaTransport, RemoveChannel);
         channel.PropertyChanged += OnChannelPropertyChanged;
         InsertOrdered(AllChannels, channel);
-        channel.SetMaximumVolume(_safety.Clamp(100, channel.Ceiling));
+        channel.SetMaximumVolume(_safety.Clamp(100));
         return channel;
     }
 
@@ -609,7 +609,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     private void RefreshChannelVolumeLimits()
     {
         foreach (var channel in AllChannels)
-            channel.SetMaximumVolume(_safety.Clamp(100, channel.Ceiling));
+            channel.SetMaximumVolume(_safety.Clamp(100));
     }
 
     private void OpenAddChannelPicker()
