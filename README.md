@@ -28,6 +28,15 @@ dotnet build src\Molecular.App\Molecular.App.csproj -c Debug --no-restore -p:Use
 
 O executável oficial é sempre `build\Molecular.exe`. A pasta `build` não é versionada.
 
+## Gerar o executável portátil
+
+```powershell
+.\scripts\publish-portable.ps1
+```
+
+O script produz uma build Release para Windows x64 com o .NET incluído e substitui
+`build\Molecular.exe`. Nenhum outro executável é mantido no projeto.
+
 ## Testes
 
 ```powershell

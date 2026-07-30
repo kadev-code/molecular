@@ -14,6 +14,13 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\Molecular.ico</ApplicationIcon>
     <NoWarn>$(NoWarn);WFAC010</NoWarn>
+    <Version>0.2.2</Version>
+    <FileVersion>0.2.2.0</FileVersion>
+    <AssemblyVersion>0.2.2.0</AssemblyVersion>
+    <Product>Molecular Personal Audio Mixer</Product>
+    <Company>Kadev</Company>
+    <Description>Mixer pessoal de áudio para Windows</Description>
+    <RepositoryUrl>https://github.com/kadev-code/molecular</RepositoryUrl>
   </PropertyGroup>
 
   <ItemGroup>
@@ -23,8 +30,12 @@
   </ItemGroup>
 
   <!-- O app publicado permanece sempre em build\Molecular.exe. -->
-  <Target Name="RemoveIntermediateAppHost" AfterTargets="Build">
+  <Target Name="RemoveIntermediateAppHost" AfterTargets="Build" Condition="'$(PublishSingleFile)' != 'true'">
     <Delete Files="$(IntermediateOutputPath)apphost.exe" />
+  </Target>
+
+  <Target Name="RemovePublishedIntermediateAppHost" AfterTargets="Publish">
+    <Delete Files="$(IntermediateOutputPath)apphost.exe;$(IntermediateOutputPath)singlefilehost.exe" />
   </Target>
 
 </Project>
