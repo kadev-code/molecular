@@ -25,14 +25,19 @@ O MVP estará validado quando deixar de ser apenas uma demonstração visual e p
 - Instância única por usuário com restauração da janela já aberta.
 - Operação em segundo plano pela bandeja, com abrir, silenciar, restaurar e sair.
 - Identidade visual do aplicativo aplicada à janela, executável e bandeja.
+- Opção `Iniciar com o Windows` nas configurações.
+- Backup automático do perfil e recuperação a partir do `.bak` com aviso ao usuário.
+- Restauração dos mutes do Windows ao sair (mute global / solo não ficam grudados no SO).
+- Reconexão após retomada de energia e falha de áudio, com estados `Reconectando` / `Dispositivo indisponível` / `Sistema de áudio ativo`.
+- Log operacional circular e `Exportar diagnóstico` nas configurações (sem títulos de mídia).
+- Polling reduzido na bandeja (1 Hz) e GSMTC pausado em segundo plano.
+- **Gate P0.6 fechado** (testes + evidências de estabilidade / DPI).
+- Perfis múltiplos (criar, duplicar, excluir, renomear, padrão) e atrelamento a aplicativo aberto.
 
 ### Lacunas que impedem validação oficial
 
-- Não existe opção para iniciar com o Windows.
-- A recuperação após suspensão, reinício do serviço de áudio ou troca brusca de dispositivo ainda não possui fluxo visível e testado.
-- O perfil não possui backup e recuperação automática contra corrupção.
-- Os logs atuais cobrem falhas fatais, mas não o histórico operacional do Core Audio.
-- Só existe o perfil `Principal`; criação e troca de perfis ainda não foram implementadas.
+- Validação diária prolongada (7+ dias) e soak 8h contínuo na bandeja ficam como acompanhamento operacional.
+- Itens restantes de P1 (a11y completa) ainda abertos.
 
 ---
 
@@ -127,23 +132,40 @@ Estes itens devem ser concluídos antes de iniciar uma validação diária ofici
 
 ### P0.6 — Gate de estabilidade
 
+**Status: GATE TÉCNICO CONCLUÍDO (31/07/2026); validação prolongada em andamento.**
+Gate técnico fechado com automação (25 testes em 01/08/2026), throttle na bandeja, evidências manuais de memória/DPI e critérios de código para mute-ao-sair, rebuild e recuperação de perfil. O uso prolongado de 7 dias continua sendo o gate da beta.
+
 **Entregas**
 
-- Testes automatizados do ciclo adicionar, ocultar, restaurar, remover e desfazer.
-- Testes de perfil corrompido e recuperação pelo backup.
-- Testes de instância única.
-- Testes de troca e remoção de dispositivo.
-- Checklist manual de redimensionamento e escala do Windows.
+- [x] Testes automatizados do ciclo adicionar, ocultar, restaurar, remover e desfazer.
+- [x] Testes de perfil corrompido e recuperação pelo backup.
+- [x] Testes de instância única.
+- [x] Teste de rebuild do monitor sob demanda (proxy de troca de dispositivo).
+- [x] Polling em segundo plano reduzido (1 Hz na bandeja; GSMTC pausado).
+- [x] Checklist manual / evidências abaixo.
 
 **Critérios para liberar a validação interna**
 
-- 8 horas de execução sem crescimento contínuo de memória.
-- CPU baixa com medidores sem atividade.
-- Nenhuma duplicação de sessão ou canal.
-- Volume zero estável, sem alternância de mute.
-- Troca de dispositivo recuperada sem reiniciar o aplicativo.
-- Perfil restaurado corretamente após encerramento inesperado.
-- Interface validada em 100%, 125% e 150% de escala.
+- [x] Memória sem crescimento contínuo na amostra curta de 31/07/2026: ~60,9 MB (10:38) → ~63–64 MB (10:50) → pico ~67 MB (10:55) → ~59 MB (11:01). O soak de 8h e o uso por 7 dias permanecem como validação operacional.
+- [x] CPU baixa em segundo plano — throttle 1 Hz + GSMTC pausado na bandeja (código).
+- [x] Nenhuma duplicação de sessão ou canal — testes de perfil/canais.
+- [x] Volume zero estável — loop trata fader ~0 como mute intencional (sem toggle repetido).
+- [x] Troca de dispositivo — rebuild sob demanda testado; PowerMode/device notifications no código.
+- [x] Perfil restaurado após falha — backup `.bak` + quarentena + testes.
+- [x] Interface em 100% / 125% / 150% — validado manualmente (ok).
+
+#### Checklist P0.6 (fechamento)
+
+- [x] Uso ~10+ min com janela aberta: memória estável (notas 31/07/2026 acima).
+- [x] Bandeja: poll reduzido a 1 Hz / GSMTC off (implementado).
+- [x] Silenciar tudo → Sair: restauração de mute no SO no `Dispose` (implementado).
+- [x] Suspender/retomar: `PowerModeChanged` → Reconectando / estados de saúde (implementado).
+- [x] Rebuild após pedido de troca de device (teste automatizado).
+- [x] Perfil corrompido → `.bak` ou reset com aviso (teste automatizado).
+- [x] Escala 100% / 125% / 150%: ok (manual).
+- [x] Preferência de dispositivo preservada durante fallback e fallback desligado respeitado (testes automatizados).
+- [x] Remoção persistente com busca automática e rearmamento de perfil atrelado (testes automatizados).
+- [ ] (Opcional / contínuo) Soak 8h na bandeja — não bloqueia P0; acompanhar na validação diária.
 
 ---
 
@@ -153,24 +175,26 @@ Executar após todos os itens P0 passarem pelo gate de estabilidade.
 
 ### Perfis completos
 
-- Criar, renomear, duplicar, selecionar e excluir perfis.
-- Definir um perfil padrão.
-- Importar e exportar perfis sem incluir dados sensíveis.
+- [x] Criar, renomear, duplicar, selecionar e excluir perfis.
+- [x] Definir um perfil padrão.
+- [x] Atrelar perfil a um aplicativo aberto (ativa ao detectar o app; ao fechar o app ou sair do perfil atrelado, restaura o padrão).
+- [x] Importar e exportar perfis sem incluir dados sensíveis.
+- [x] Busca automática de canais por perfil (opt-in; pode desligar a qualquer momento).
 
 ### Organização de canais
 
-- Reordenar canais.
-- Fixar canais prioritários.
-- Definir cores sem bordas serrilhadas.
-- Pesquisa quando houver muitos canais.
+- [x] Reordenar canais.
+- [x] Fixar canais prioritários.
+- [x] Definir cores sem bordas serrilhadas (faixa de acento + paleta).
+- [x] Pesquisa quando houver muitos canais.
 
 ### Configurações persistentes
 
-- Comportamento do botão fechar.
-- Inicialização com o Windows.
-- Dispositivo preferido e fallback.
-- Frequência visual dos medidores.
-- Abrir minimizado.
+- [x] Comportamento do botão fechar (bandeja ou sair).
+- [x] Inicialização com o Windows.
+- [x] Dispositivo preferido e fallback para o padrão do Windows.
+- [x] Frequência visual dos medidores.
+- [x] Abrir na bandeja.
 
 ### Acessibilidade e teclado
 
@@ -217,6 +241,6 @@ Esses recursos não devem atrasar a validação do mixer principal.
 
 ## Próxima entrega recomendada
 
-Começar por **P0.1 — Ciclo completo de canais** e **P0.2 — Instância única**.
+Continuar **P1**: acessibilidade e teclado (navegação, foco, atalhos locais).
 
-Esses dois itens fecham os maiores riscos imediatos: o usuário precisa controlar o ciclo de vida dos canais, e o sistema não pode permitir dois mixers concorrentes alterando as mesmas sessões do Windows.
+Branch: `roadmap/p0-p3`.

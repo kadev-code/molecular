@@ -7,7 +7,8 @@ public interface IAudioSessionService : IDisposable
     event EventHandler? OutputDevicesChanged;
     string OutputDeviceName { get; }
     IReadOnlyList<AudioOutputDevice> ReadOutputDevices();
-    void SelectOutputDevice(string? deviceId);
+    void SelectOutputDevice(string? deviceId, bool allowDefaultFallback = true);
+    void RequestSessionRebuild();
     IReadOnlyList<AudioApplication> ReadApplications();
     void ApplyChanges(IReadOnlyCollection<AudioSessionChange> changes);
     void SetVolume(string applicationKey, double volumePercent);

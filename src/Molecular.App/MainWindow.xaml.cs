@@ -7,6 +7,7 @@ using System.Windows.Interop;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
+using Microsoft.Win32;
 using Molecular.App.ViewModels;
 using Molecular.Core.Audio;
 using Molecular.Core.Persistence;
@@ -19,6 +20,8 @@ public partial class MainWindow : Window
 {
     private const int WmGetMinMaxInfo = 0x0024;
     private const uint MonitorDefaultToNearest = 0x00000002;
+    private static readonly TimeSpan ForegroundPollInterval = TimeSpan.FromMilliseconds(100);
+    private static readonly TimeSpan BackgroundPollInterval = TimeSpan.FromSeconds(1);
     private readonly MainViewModel _viewModel;
     private readonly DispatcherTimer _refreshTimer;
     private HwndSource? _windowSource;
@@ -34,25 +37,42 @@ public partial class MainWindow : Window
         StateChanged += (_, _) => AppFrame.CornerRadius = WindowState == WindowState.Maximized
             ? new CornerRadius(0)
             : new CornerRadius(16);
-        SizeChanged += (_, _) => _viewModel.UpdateViewportWidth(ActualWidth);
+        SizeChanged += (_, _) =>
+        {
+            _viewModel.UpdateViewportWidth(ActualWidth);
+            _viewModel.UpdateDpiScale(VisualTreeHelper.GetDpi(this).DpiScaleX);
+        };
         Closing += OnClosing;
+        SystemEvents.PowerModeChanged += OnPowerModeChanged;
 
         _refreshTimer = new DispatcherTimer(DispatcherPriority.Background)
         {
-            Interval = TimeSpan.FromMilliseconds(100)
+            Interval = TimeSpan.FromMilliseconds(Math.Max(50, _viewModel.MeterIntervalMs))
         };
         _refreshTimer.Tick += async (_, _) => await _viewModel.TickAsync();
+        _viewModel.MeterIntervalChanged += (_, _) =>
+            _refreshTimer.Interval = TimeSpan.FromMilliseconds(Math.Max(50, _viewModel.MeterIntervalMs));
         Loaded += async (_, _) =>
         {
+            _viewModel.UpdateDpiScale(VisualTreeHelper.GetDpi(this).DpiScaleX);
             await _viewModel.TickAsync();
             _refreshTimer.Start();
+            if (_viewModel.ShouldStartInTray)
+                HideToTray();
         };
         Closed += (_, _) =>
         {
+            SystemEvents.PowerModeChanged -= OnPowerModeChanged;
             _refreshTimer.Stop();
             _windowSource?.RemoveHook(WindowMessageHook);
             _viewModel.Dispose();
         };
+    }
+
+    private void OnPowerModeChanged(object sender, PowerModeChangedEventArgs e)
+    {
+        if (e.Mode != PowerModes.Resume) return;
+        Dispatcher.BeginInvoke(() => _viewModel.NotifyPowerResumed());
     }
 
     private void OnSourceInitialized(object? sender, EventArgs e)
@@ -131,17 +151,28 @@ public partial class MainWindow : Window
     private void MinimizeButton_Click(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
     private void MaximizeButton_Click(object sender, RoutedEventArgs e) =>
         WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
-    private void CloseButton_Click(object sender, RoutedEventArgs e) => HideToTray();
+    private void CloseButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_viewModel.CloseToTray) HideToTray();
+        else ExitApplication();
+    }
 
     private void OnClosing(object? sender, CancelEventArgs e)
     {
         if (_allowClose) return;
-        e.Cancel = true;
-        HideToTray();
+        if (_viewModel.CloseToTray)
+        {
+            e.Cancel = true;
+            HideToTray();
+            return;
+        }
+
+        _allowClose = true;
     }
 
     private void HideToTray()
     {
+        SetBackgroundPolling(true);
         Hide();
         ShowInTaskbar = false;
     }
@@ -155,6 +186,15 @@ public partial class MainWindow : Window
         Topmost = true;
         Topmost = false;
         Focus();
+        SetBackgroundPolling(false);
+    }
+
+    private void SetBackgroundPolling(bool background)
+    {
+        _viewModel.SetBackgroundMode(background);
+        _refreshTimer.Interval = background
+            ? BackgroundPollInterval
+            : TimeSpan.FromMilliseconds(Math.Max(50, _viewModel.MeterIntervalMs));
     }
 
     public void SetGlobalMute(bool muted) => _viewModel.SetGlobalMute(muted);

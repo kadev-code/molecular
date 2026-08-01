@@ -1,6 +1,7 @@
 using System.IO;
 using System.Windows;
 using System.Windows.Threading;
+using Molecular.Core.Diagnostics;
 using Molecular.Core.Runtime;
 
 namespace Molecular.App;
@@ -21,6 +22,7 @@ public partial class App : System.Windows.Application
                 return;
             }
 
+            OperationalLog.Shared.Info("app", "Molecular iniciado");
             var window = new MainWindow();
             MainWindow = window;
             _singleInstance!.ActivationRequested += (_, _) => Dispatcher.BeginInvoke(window.ShowFromTray);
@@ -33,6 +35,7 @@ public partial class App : System.Windows.Application
         }
         catch (Exception exception)
         {
+            OperationalLog.Shared.Error("app", $"Falha na inicialização: {exception.Message}");
             WriteCrashLog(exception);
             MessageBox.Show(
                 $"O Molecular não conseguiu iniciar.\n\n{exception.Message}\n\nUm diagnóstico foi salvo em Molecular\\Logs.",

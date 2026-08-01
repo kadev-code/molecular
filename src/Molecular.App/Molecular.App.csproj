@@ -4,9 +4,6 @@
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
     <AssemblyName>Molecular</AssemblyName>
-    <OutputPath>..\..\build\</OutputPath>
-    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
-    <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
     <Nullable>enable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
     <UseWPF>true</UseWPF>
@@ -29,7 +26,7 @@
     <Resource Include="Assets\Molecular.png" />
   </ItemGroup>
 
-  <!-- O app publicado permanece sempre em build\Molecular.exe. -->
+  <!-- Builds comuns ficam em bin/. Apenas publish-portable.ps1 substitui build\Molecular.exe. -->
   <Target Name="RemoveIntermediateAppHost" AfterTargets="Build" Condition="'$(PublishSingleFile)' != 'true'">
     <Delete Files="$(IntermediateOutputPath)apphost.exe" />
   </Target>

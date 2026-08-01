@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using Molecular.Core.Diagnostics;
 using Molecular.Core.Models;
 using NAudio.CoreAudioApi;
 using NAudio.CoreAudioApi.Interfaces;
@@ -28,6 +29,7 @@ public sealed class WindowsAudioSessionService : IAudioSessionService
     private readonly MMDeviceEnumerator _notificationEnumerator;
     private readonly DeviceNotificationClient _notificationClient;
     private volatile string? _selectedDeviceId;
+    private volatile bool _allowDefaultFallback = true;
     private MMDevice? _sessionDevice;
     private AudioSessionManager? _sessionManager;
     private int _sessionsNeedRebuild = 1;
@@ -36,8 +38,9 @@ public sealed class WindowsAudioSessionService : IAudioSessionService
     public WindowsAudioSessionService()
     {
         _notificationEnumerator = new MMDeviceEnumerator();
-        _notificationClient = new DeviceNotificationClient(OnOutputDevicesChanged);
+        _notificationClient = new DeviceNotificationClient(OnOutputDevicesChanged, OnOutputDeviceListChanged);
         _notificationEnumerator.RegisterEndpointNotificationCallback(_notificationClient);
+        OperationalLog.Shared.Info("audio", "Serviço Core Audio inicializado");
     }
 
     public event EventHandler? OutputDevicesChanged;
@@ -69,11 +72,20 @@ public sealed class WindowsAudioSessionService : IAudioSessionService
         return result.OrderByDescending(device => device.IsDefault).ThenBy(device => device.Name).ToArray();
     }
 
-    public void SelectOutputDevice(string? deviceId)
+    public void SelectOutputDevice(string? deviceId, bool allowDefaultFallback = true)
     {
-        if (string.Equals(_selectedDeviceId, deviceId, StringComparison.OrdinalIgnoreCase)) return;
+        if (string.Equals(_selectedDeviceId, deviceId, StringComparison.OrdinalIgnoreCase)
+            && _allowDefaultFallback == allowDefaultFallback)
+        {
+            return;
+        }
+
         _selectedDeviceId = deviceId;
+        _allowDefaultFallback = allowDefaultFallback;
         Interlocked.Exchange(ref _sessionsNeedRebuild, 1);
+        OperationalLog.Shared.Info(
+            "audio",
+            $"Dispositivo preferido alterado: {deviceId ?? "(padrão)"}; fallback={(allowDefaultFallback ? "sim" : "não")}");
     }
 
     public IReadOnlyList<AudioApplication> ReadApplications()
@@ -169,24 +181,35 @@ public sealed class WindowsAudioSessionService : IAudioSessionService
 
     private void EnsureSessionMonitor()
     {
-        if (_sessionManager is not null && Interlocked.CompareExchange(ref _sessionsNeedRebuild, 0, 0) == 0)
-            return;
+        while (true)
+        {
+            if (_sessionManager is not null && Interlocked.CompareExchange(ref _sessionsNeedRebuild, 0, 0) == 0)
+                return;
 
-        DisposeSessionMonitor();
-        using var deviceEnumerator = new MMDeviceEnumerator();
-        _sessionDevice = GetActiveDevice(deviceEnumerator);
-        OutputDeviceName = _sessionDevice.FriendlyName;
-        _sessionManager = _sessionDevice.AudioSessionManager;
+            // Clear the flag before rebuilding so a concurrent request during
+            // rebuild is preserved and triggers another pass below.
+            Interlocked.Exchange(ref _sessionsNeedRebuild, 0);
+            DisposeSessionMonitor();
+            using var deviceEnumerator = new MMDeviceEnumerator();
+            _sessionDevice = GetActiveDevice(deviceEnumerator);
+            OutputDeviceName = _sessionDevice.FriendlyName;
+            _sessionManager = _sessionDevice.AudioSessionManager;
 
-        // Register before taking the initial snapshot. A callback that races the
-        // enumeration is deduplicated by the session instance identifier.
-        _sessionManager.OnSessionCreated += OnSessionCreated;
-        _sessionManager.RefreshSessions();
-        var sessions = _sessionManager.Sessions;
-        for (var index = 0; index < sessions.Count; index++)
-            AddSession(sessions[index]);
+            // Register before taking the initial snapshot. A callback that races the
+            // enumeration is deduplicated by the session instance identifier.
+            _sessionManager.OnSessionCreated += OnSessionCreated;
+            _sessionManager.RefreshSessions();
+            var sessions = _sessionManager.Sessions;
+            for (var index = 0; index < sessions.Count; index++)
+                AddSession(sessions[index]);
 
-        Interlocked.Exchange(ref _sessionsNeedRebuild, 0);
+            OperationalLog.Shared.Info(
+                "audio",
+                $"Monitor reconstruído em '{OutputDeviceName}' com {_sessions.Count} sessão(ões)");
+
+            if (Interlocked.CompareExchange(ref _sessionsNeedRebuild, 0, 0) == 0)
+                return;
+        }
     }
 
     private void OnSessionCreated(object sender, IAudioSessionControl newSession)
@@ -231,6 +254,9 @@ public sealed class WindowsAudioSessionService : IAudioSessionService
             });
             control.RegisterEventClient(tracked.EventHandler);
             _sessions.Add(instanceId, tracked);
+            OperationalLog.Shared.Info(
+                "session",
+                $"Sessão criada: {tracked.Identity.Key} ({tracked.Identity.ExecutableName ?? "sem exe"})");
         }
         catch
         {
@@ -294,6 +320,9 @@ public sealed class WindowsAudioSessionService : IAudioSessionService
     private void RemoveSession(string instanceId)
     {
         if (!_sessions.Remove(instanceId, out var session)) return;
+        OperationalLog.Shared.Info(
+            "session",
+            $"Sessão removida: {session.Identity.Key} ({session.Identity.ExecutableName ?? "sem exe"})");
         session.Dispose();
     }
 
@@ -343,10 +372,24 @@ public sealed class WindowsAudioSessionService : IAudioSessionService
         _sessionDevice = null;
     }
 
+    public void RequestSessionRebuild()
+    {
+        if (_disposed) return;
+        Interlocked.Exchange(ref _sessionsNeedRebuild, 1);
+        OperationalLog.Shared.Info("audio", "Reconstrução do monitor solicitada");
+    }
+
     private void OnOutputDevicesChanged()
     {
         if (_disposed) return;
         Interlocked.Exchange(ref _sessionsNeedRebuild, 1);
+        OperationalLog.Shared.Info("audio", "Topologia de dispositivo alterada");
+        OutputDevicesChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void OnOutputDeviceListChanged()
+    {
+        if (_disposed) return;
         OutputDevicesChanged?.Invoke(this, EventArgs.Empty);
     }
 
@@ -354,8 +397,23 @@ public sealed class WindowsAudioSessionService : IAudioSessionService
     {
         if (!string.IsNullOrWhiteSpace(_selectedDeviceId))
         {
-            try { return deviceEnumerator.GetDevice(_selectedDeviceId); }
-            catch { _selectedDeviceId = null; }
+            try
+            {
+                var preferred = deviceEnumerator.GetDevice(_selectedDeviceId);
+                if (preferred.State == DeviceState.Active) return preferred;
+                preferred.Dispose();
+                if (!_allowDefaultFallback)
+                    throw new InvalidOperationException("O dispositivo de saída preferido está indisponível.");
+            }
+            catch when (_allowDefaultFallback)
+            {
+                // Keep the preferred id. Device notifications will rebuild the
+                // monitor and return to it automatically when it reconnects.
+            }
+            catch (Exception exception)
+            {
+                throw new InvalidOperationException("O dispositivo de saída preferido está indisponível.", exception);
+            }
         }
 
         return deviceEnumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
@@ -464,17 +522,19 @@ public sealed class WindowsAudioSessionService : IAudioSessionService
         public void OnSessionDisconnected(AudioSessionDisconnectReason disconnectReason) => enqueue(new DisconnectedEvent());
     }
 
-    private sealed class DeviceNotificationClient(Action changed) : IMMNotificationClient
+    private sealed class DeviceNotificationClient(Action sessionTopologyChanged, Action deviceListChanged) : IMMNotificationClient
     {
-        public void OnDeviceStateChanged(string deviceId, DeviceState newState) => changed();
-        public void OnDeviceAdded(string pwstrDeviceId) => changed();
-        public void OnDeviceRemoved(string deviceId) => changed();
+        public void OnDeviceStateChanged(string deviceId, DeviceState newState) => sessionTopologyChanged();
+        public void OnDeviceAdded(string pwstrDeviceId) => sessionTopologyChanged();
+        public void OnDeviceRemoved(string deviceId) => sessionTopologyChanged();
 
         public void OnDefaultDeviceChanged(DataFlow flow, Role role, string defaultDeviceId)
         {
-            if (flow is DataFlow.Render or DataFlow.All) changed();
+            if (flow is DataFlow.Render or DataFlow.All) sessionTopologyChanged();
         }
 
-        public void OnPropertyValueChanged(string pwstrDeviceId, PropertyKey key) => changed();
+        // Friendly-name / property churn should refresh the device picker only.
+        // Rebuilding every session monitor here caused offline flashes.
+        public void OnPropertyValueChanged(string pwstrDeviceId, PropertyKey key) => deviceListChanged();
     }
 }

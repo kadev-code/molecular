@@ -56,6 +56,12 @@
             <GradientStop Color="#A24CFF" Offset="0.58" />
             <GradientStop Color="#D94DFF" Offset="1" />
         </LinearGradientBrush>
+        <!-- Compact fader tip accent — cyan → violet, same family as brand -->
+        <LinearGradientBrush x:Key="FaderKnobMark" StartPoint="0,0.5" EndPoint="1,0.5">
+            <GradientStop Color="#25D7E8" Offset="0" />
+            <GradientStop Color="#7B5CFF" Offset="0.55" />
+            <GradientStop Color="#D94DFF" Offset="1" />
+        </LinearGradientBrush>
         <LinearGradientBrush x:Key="MeterGradient" StartPoint="0,1" EndPoint="0,0">
             <GradientStop Color="#28D99A" Offset="0" />
             <GradientStop Color="#79E757" Offset="0.66" />
@@ -128,7 +134,8 @@
                     <ControlTemplate TargetType="Button">
                         <Border x:Name="ButtonBorder" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="11" Padding="{TemplateBinding Padding}">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
@@ -217,17 +224,20 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Slider">
+                        <!-- Margin must match VolumeToFaderPositionConverter.TrackTop -->
                         <Grid Margin="0,18">
                             <Border Width="12" Background="Transparent" BorderBrush="Transparent" BorderThickness="1" CornerRadius="6" />
                             <Track x:Name="PART_Track" Orientation="Vertical" IsDirectionReversed="False">
                                 <Track.DecreaseRepeatButton><RepeatButton Command="{x:Static Slider.DecreaseLarge}" Opacity="0" /></Track.DecreaseRepeatButton>
                                 <Track.IncreaseRepeatButton><RepeatButton Command="{x:Static Slider.IncreaseLarge}" Opacity="0" /></Track.IncreaseRepeatButton>
                                 <Track.Thumb>
-                                    <Thumb Width="50" Height="36" Opacity="0">
+                                    <!-- Visible tip is the real Thumb so it always tracks the mouse -->
+                                    <Thumb Width="40" Height="22">
                                         <Thumb.Template>
                                             <ControlTemplate TargetType="Thumb">
-                                                <Border Background="#202735" BorderThickness="0" CornerRadius="18">
-                                                    <Border Height="4" Width="28" Background="{StaticResource BrandGradient}" CornerRadius="2" />
+                                                <Border Background="#CC1A2230" BorderBrush="#334155" BorderThickness="1" CornerRadius="11">
+                                                    <Border Height="2.5" Width="18" Background="{StaticResource FaderKnobMark}" CornerRadius="1.25"
+                                                            VerticalAlignment="Center" HorizontalAlignment="Center" />
                                                 </Border>
                                             </ControlTemplate>
                                         </Thumb.Template>
@@ -321,6 +331,7 @@
         <Style x:Key="PillComboBox" TargetType="ComboBox">
             <Setter Property="Foreground" Value="{StaticResource TextPrimary}" /><Setter Property="Background" Value="#151C28" />
             <Setter Property="BorderBrush" Value="Transparent" /><Setter Property="BorderThickness" Value="0" /><Setter Property="Padding" Value="18,0,38,0" />
+            <Setter Property="MaxDropDownHeight" Value="220" />
             <Setter Property="ItemContainerStyle">
                 <Setter.Value>
                     <Style TargetType="ComboBoxItem">
@@ -350,9 +361,13 @@
                                 </ControlTemplate></ToggleButton.Template>
                             </ToggleButton>
                             <ContentPresenter IsHitTestVisible="False" Margin="{TemplateBinding Padding}" VerticalAlignment="Center" Content="{TemplateBinding SelectionBoxItem}" ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}" ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}" />
-                            <Popup x:Name="PART_Popup" IsOpen="{TemplateBinding IsDropDownOpen}" Placement="Bottom" AllowsTransparency="True" PopupAnimation="Fade">
-                                <Border Margin="0,5,0,0" MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}" MaxHeight="280" Background="#1B2230" BorderThickness="0" CornerRadius="12">
-                                    <ScrollViewer Margin="4"><ItemsPresenter /></ScrollViewer>
+                            <Popup x:Name="PART_Popup" IsOpen="{TemplateBinding IsDropDownOpen}" Placement="Bottom"
+                                   PlacementTarget="{Binding RelativeSource={RelativeSource TemplatedParent}}"
+                                   AllowsTransparency="True" PopupAnimation="Fade" StaysOpen="False">
+                                <Border Margin="0,5,0,0" MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}"
+                                        MaxHeight="{TemplateBinding MaxDropDownHeight}" Background="#1B2230" BorderBrush="#3A465C"
+                                        BorderThickness="1" CornerRadius="12">
+                                    <ScrollViewer Margin="4" MaxHeight="{TemplateBinding MaxDropDownHeight}"><ItemsPresenter /></ScrollViewer>
                                 </Border>
                             </Popup>
                         </Grid>
@@ -409,7 +424,9 @@
                         <Border Width="1" Height="28" Background="#273044" Margin="10,0" />
                         <Button Style="{StaticResource WindowButton}" Content="—" ToolTip="Minimizar" Click="MinimizeButton_Click" AutomationProperties.Name="Minimizar" />
                         <Button Style="{StaticResource WindowButton}" Content="□" ToolTip="Maximizar ou restaurar" Click="MaximizeButton_Click" AutomationProperties.Name="Maximizar ou restaurar" />
-                        <Button x:Name="CloseButton" Style="{StaticResource CloseWindowButton}" Content="×" ToolTip="Ocultar na bandeja" Click="CloseButton_Click" AutomationProperties.Name="Ocultar na bandeja" />
+                        <Button x:Name="CloseButton" Style="{StaticResource CloseWindowButton}" Content="×"
+                                ToolTip="{Binding CloseButtonToolTip}" Click="CloseButton_Click"
+                                AutomationProperties.Name="{Binding CloseButtonToolTip}" />
                     </StackPanel>
                 </Grid>
             </Border>
@@ -419,16 +436,21 @@
 
                 <!-- Workspace -->
                 <Grid x:Name="WorkspaceGrid" Grid.Column="0" Margin="0,0,18,0">
-                    <Grid.RowDefinitions><RowDefinition Height="203" /><RowDefinition Height="*" /><RowDefinition Height="58" /></Grid.RowDefinitions>
+                    <Grid.RowDefinitions><RowDefinition Height="203" /><RowDefinition Height="*" /><RowDefinition Height="Auto" MinHeight="44" /></Grid.RowDefinitions>
 
                     <!-- Canais rápidos -->
                     <Grid Grid.Row="0">
                         <Grid.RowDefinitions><RowDefinition Height="32" /><RowDefinition Height="*" /></Grid.RowDefinitions>
                         <Grid>
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Top">
-                                <TextBlock Text="CANAIS RÁPIDOS" FontSize="12" FontWeight="Bold" />
-                                <TextBlock Text="Clique no canto do card para expandir" FontSize="12" Foreground="{StaticResource TextDisabled}" Margin="18,0,0,0"
-                                           Visibility="{Binding ActualWidth, ElementName=WorkspaceGrid, Converter={StaticResource ExpandedPanelVisibilityConverter}}" />
+                                <TextBlock Text="CANAIS RÁPIDOS" FontSize="12" FontWeight="Bold" VerticalAlignment="Center" />
+                                <TextBox Width="150" Height="26" Margin="14,0,0,0" Padding="8,3"
+                                         VerticalContentAlignment="Center"
+                                         Background="#151C28" Foreground="#F2F5FA" BorderBrush="#3A465C" BorderThickness="1"
+                                         CaretBrush="White" FontSize="11"
+                                         Text="{Binding ChannelFilter, UpdateSourceTrigger=PropertyChanged}"
+                                         ToolTip="Pesquisar canais por nome"
+                                         AutomationProperties.Name="Pesquisar canais" />
                                 <Button Height="26" Padding="10,0" Margin="14,-5,0,0" Content="{Binding QuickInactiveButtonText}" Command="{Binding ToggleInactiveQuickChannelsCommand}">
                                     <Button.Style>
                                         <Style TargetType="Button" BasedOn="{StaticResource SurfaceButton}">
@@ -469,58 +491,92 @@
                                     <ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Rows="1" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
-                                            <Border Height="145" Margin="0,0,12,8" Padding="14,13" BorderThickness="0" CornerRadius="16">
+                                            <Border x:Name="QuickChannelCard" Height="145" Margin="0,0,12,8" Padding="12,12" BorderThickness="0" CornerRadius="16">
                                                 <Border.Style>
                                                     <Style TargetType="Border">
                                                         <Setter Property="Background" Value="{StaticResource Card}" />
-                                                        <Setter Property="BorderBrush" Value="{StaticResource Border}" />
                                                         <Setter Property="Opacity" Value="{Binding CardOpacity}" />
                                                         <Style.Triggers>
                                                             <DataTrigger Binding="{Binding IsDisconnected}" Value="True">
                                                                 <Setter Property="Background" Value="#111620" />
-                                                                <Setter Property="BorderBrush" Value="#343C4B" />
                                                                 <Setter Property="Opacity" Value="0.62" />
                                                             </DataTrigger>
                                                         </Style.Triggers>
                                                     </Style>
                                                 </Border.Style>
                                                 <Grid>
-                                                    <Grid.RowDefinitions><RowDefinition Height="44" /><RowDefinition Height="30" /><RowDefinition Height="40" /></Grid.RowDefinitions>
-                                                    <Grid Grid.Row="0">
-                                                        <Grid.ColumnDefinitions><ColumnDefinition Width="42" /><ColumnDefinition Width="*" /><ColumnDefinition Width="34" /><ColumnDefinition Width="36" /></Grid.ColumnDefinitions>
-                                                        <Grid Width="36" Height="36">
+                                                    <Grid.RowDefinitions>
+                                                        <RowDefinition Height="Auto" />
+                                                        <RowDefinition Height="40" />
+                                                        <RowDefinition Height="28" />
+                                                        <RowDefinition Height="*" />
+                                                    </Grid.RowDefinitions>
+                                                    <Border Height="4" CornerRadius="2" Background="{Binding AccentBrush}"
+                                                            HorizontalAlignment="Stretch" IsHitTestVisible="False" Margin="0,0,0,8" />
+                                                    <Grid Grid.Row="1">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="40" />
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <Grid Width="34" Height="34">
                                                             <Ellipse Fill="#273044" />
                                                             <TextBlock Style="{StaticResource InitialFallbackText}" Text="{Binding Initials}" HorizontalAlignment="Center" VerticalAlignment="Center" FontWeight="SemiBold" />
-                                                            <Image Source="{Binding CompactIconSource}" Width="32" Height="32" />
+                                                            <Image Source="{Binding CompactIconSource}" Width="30" Height="30" />
                                                         </Grid>
-                                                        <StackPanel Grid.Column="1" Margin="8,0,4,0" VerticalAlignment="Center">
-                                                            <TextBlock Text="{Binding ApplicationName}" FontSize="14" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                                        <TextBlock Text="{Binding QuickStatusText}" FontSize="11" FontWeight="Bold" Margin="0,2,0,0">
-                                                                <TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Foreground" Value="#27D99A" /><Style.Triggers><DataTrigger Binding="{Binding IsDisconnected}" Value="True"><Setter Property="Foreground" Value="#7D8799" /></DataTrigger></Style.Triggers></Style></TextBlock.Style>
+                                                        <StackPanel Grid.Column="1" Margin="8,0,6,0" VerticalAlignment="Center">
+                                                            <TextBlock Text="{Binding ApplicationName}" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                            <TextBlock Text="{Binding QuickStatusText}" FontSize="10" FontWeight="Bold" Margin="0,2,0,0">
+                                                                <TextBlock.Style>
+                                                                    <Style TargetType="TextBlock">
+                                                                        <Setter Property="Foreground" Value="#27D99A" />
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding IsDisconnected}" Value="True"><Setter Property="Foreground" Value="#7D8799" /></DataTrigger>
+                                                                            <DataTrigger Binding="{Binding IsPinned}" Value="True"><Setter Property="Foreground" Value="#F0A202" /></DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </TextBlock.Style>
                                                             </TextBlock>
                                                         </StackPanel>
-                                                        <Button Grid.Column="2" Style="{StaticResource SurfaceButton}" Padding="0" Width="30" Height="34" Command="{Binding ToggleHiddenCommand}" ToolTip="{Binding HideActionText}"
-                                                                AutomationProperties.Name="{Binding HideActionText}">
-                                                            <Grid Width="16" Height="14">
-                                                                <Path Data="M1,7 C4,2.5 12,2.5 15,7 C12,11.5 4,11.5 1,7 Z" Stroke="#AAB5C7" StrokeThickness="1.2" Fill="Transparent" />
-                                                                <Ellipse Width="4" Height="4" Stroke="#AAB5C7" StrokeThickness="1.2" />
-                                                                <Path Data="M2,1 L14,13" Stroke="#AAB5C7" StrokeThickness="1.4">
-                                                                    <Path.Style><Style TargetType="Path"><Setter Property="Visibility" Value="Visible" /><Style.Triggers><DataTrigger Binding="{Binding IsHidden}" Value="True"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger></Style.Triggers></Style></Path.Style>
-                                                                </Path>
-                                                            </Grid>
-                                                        </Button>
-                                                        <Button Grid.Column="3" Style="{StaticResource SurfaceButton}" Padding="0" Width="34" Height="34" Command="{Binding ToggleExpandedCommand}" ToolTip="Expandir canal" AutomationProperties.Name="Expandir canal">
-                                                            <TextBlock FontFamily="Segoe MDL2 Assets" FontSize="13" Text="&#xE740;" />
-                                                        </Button>
+                                                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                                            <StackPanel.Style>
+                                                                <Style TargetType="StackPanel">
+                                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding IsMouseOver, ElementName=QuickChannelCard}" Value="True">
+                                                                            <Setter Property="Visibility" Value="Visible" />
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </StackPanel.Style>
+                                                            <Button Style="{StaticResource SurfaceButton}" Padding="0" Width="24" Height="30" Margin="0,0,2,0" Command="{Binding MoveEarlierCommand}" ToolTip="Mover para a esquerda" AutomationProperties.Name="Mover canal para a esquerda">
+                                                                <TextBlock FontFamily="Segoe MDL2 Assets" FontSize="10" Text="&#xE76B;" />
+                                                            </Button>
+                                                            <Button Style="{StaticResource SurfaceButton}" Padding="0" Width="24" Height="30" Margin="0,0,2,0" Command="{Binding MoveLaterCommand}" ToolTip="Mover para a direita" AutomationProperties.Name="Mover canal para a direita">
+                                                                <TextBlock FontFamily="Segoe MDL2 Assets" FontSize="10" Text="&#xE76C;" />
+                                                            </Button>
+                                                            <Button Style="{StaticResource SurfaceButton}" Padding="0" Width="26" Height="30" Margin="0,0,2,0" Command="{Binding ToggleHiddenCommand}" ToolTip="{Binding HideActionText}" AutomationProperties.Name="{Binding HideActionText}">
+                                                                <Grid Width="14" Height="12">
+                                                                    <Path Data="M1,6 C3.5,2 10.5,2 13,6 C10.5,10 3.5,10 1,6 Z" Stroke="#AAB5C7" StrokeThickness="1.2" Fill="Transparent" />
+                                                                    <Ellipse Width="3.5" Height="3.5" Stroke="#AAB5C7" StrokeThickness="1.2" />
+                                                                    <Path Data="M2,1 L12,11" Stroke="#AAB5C7" StrokeThickness="1.3">
+                                                                        <Path.Style><Style TargetType="Path"><Setter Property="Visibility" Value="Visible" /><Style.Triggers><DataTrigger Binding="{Binding IsHidden}" Value="True"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger></Style.Triggers></Style></Path.Style>
+                                                                    </Path>
+                                                                </Grid>
+                                                            </Button>
+                                                            <Button Style="{StaticResource SurfaceButton}" Padding="0" Width="28" Height="30" Command="{Binding ToggleExpandedCommand}" ToolTip="Expandir canal" AutomationProperties.Name="Expandir canal">
+                                                                <TextBlock FontFamily="Segoe MDL2 Assets" FontSize="12" Text="&#xE740;" />
+                                                            </Button>
+                                                        </StackPanel>
                                                     </Grid>
-                                                    <ProgressBar Grid.Row="1" Style="{StaticResource SegmentedMeter}" Value="{Binding Peak, Mode=OneWay}" Margin="0,8,0,8" />
-                                                    <Grid Grid.Row="2">
-                                                        <Grid.ColumnDefinitions><ColumnDefinition Width="42" /><ColumnDefinition /><ColumnDefinition Width="48" /></Grid.ColumnDefinitions>
-                                                        <Button Width="38" Height="36" MinWidth="0" Padding="0" Content="M" Command="{Binding ToggleMuteCommand}" ToolTip="Mutar ou desmutar canal">
+                                                    <ProgressBar Grid.Row="2" Style="{StaticResource SegmentedMeter}" Value="{Binding Peak, Mode=OneWay}" Margin="0,4,0,4" />
+                                                    <Grid Grid.Row="3">
+                                                        <Grid.ColumnDefinitions><ColumnDefinition Width="38" /><ColumnDefinition /><ColumnDefinition Width="42" /></Grid.ColumnDefinitions>
+                                                        <Button Width="34" Height="34" MinWidth="0" Padding="0" Content="M" Command="{Binding ToggleMuteCommand}" ToolTip="Mutar ou desmutar canal" VerticalAlignment="Center">
                                                             <Button.Style><Style TargetType="Button" BasedOn="{StaticResource ChannelActionButton}"><Setter Property="Width" Value="34" /><Setter Property="MinWidth" Value="0" /><Setter Property="Padding" Value="0" /><Style.Triggers><DataTrigger Binding="{Binding IsMuted}" Value="True"><Setter Property="Background" Value="#633547" /><Setter Property="Foreground" Value="#FFB5C4" /></DataTrigger></Style.Triggers></Style></Button.Style>
                                                         </Button>
-                                                        <Slider Grid.Column="1" Style="{StaticResource CompactSlider}" Foreground="{StaticResource MeterGradient}" Value="{Binding TargetVolume, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Margin="8,0" ToolTip="Volume do canal — use a roda do mouse para ajustar ±1%" IsEnabled="{Binding IsOnline}" PreviewMouseWheel="VolumeSlider_PreviewMouseWheel" ValueChanged="ChannelVolumeSlider_ValueChanged" />
-                                                        <TextBlock Grid.Column="2" Text="{Binding VolumeDisplayText}" VerticalAlignment="Center" HorizontalAlignment="Right" FontWeight="SemiBold" />
+                                                        <Slider Grid.Column="1" Style="{StaticResource CompactSlider}" Foreground="{StaticResource MeterGradient}" Value="{Binding TargetVolume, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Margin="6,0" VerticalAlignment="Center" ToolTip="Volume do canal — use a roda do mouse para ajustar ±1%" IsEnabled="{Binding IsOnline}" PreviewMouseWheel="VolumeSlider_PreviewMouseWheel" ValueChanged="ChannelVolumeSlider_ValueChanged" />
+                                                        <TextBlock Grid.Column="2" Text="{Binding VolumeDisplayText}" VerticalAlignment="Center" HorizontalAlignment="Right" FontWeight="SemiBold" FontSize="12" />
                                                     </Grid>
                                                 </Grid>
                                             </Border>
@@ -554,7 +610,7 @@
                             </Button>
                         </Grid>
                         <ScrollViewer x:Name="ExpandedChannelsScrollViewer" Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                            <ItemsControl ItemsSource="{Binding ExpandedChannels}">
+                            <ItemsControl ItemsSource="{Binding DisplayedExpandedChannels}">
                                 <ItemsControl.ItemsPanel>
                                     <ItemsPanelTemplate>
                                         <UniformGrid>
@@ -572,7 +628,7 @@
                                         <Grid>
                                         <Border x:Name="ResponsiveExpandedCard"
                                                 MinHeight="{Binding ActualHeight, RelativeSource={RelativeSource AncestorType={x:Type ScrollViewer}}, Converter={StaticResource ExpandedCardHeightConverter}}"
-                                                MaxHeight="460" VerticalAlignment="Top" Margin="0,0,12,12" Padding="18" BorderThickness="0" CornerRadius="20">
+                                                MaxHeight="450" VerticalAlignment="Top" Margin="0,0,12,12" Padding="18" BorderThickness="0" CornerRadius="20">
                                             <Border.Style>
                                                 <Style TargetType="Border">
                                                     <Setter Property="Background" Value="#121823" />
@@ -591,11 +647,12 @@
                                                 <Grid.RowDefinitions><RowDefinition Height="58" /><RowDefinition Height="*" /></Grid.RowDefinitions>
 
                                                 <Grid>
-                                                    <Grid.ColumnDefinitions><ColumnDefinition Width="58" /><ColumnDefinition Width="*" /><ColumnDefinition Width="42" /></Grid.ColumnDefinitions>
+                                                    <Grid.ColumnDefinitions><ColumnDefinition Width="58" /><ColumnDefinition Width="*" /><ColumnDefinition Width="36" /><ColumnDefinition Width="36" /><ColumnDefinition Width="36" /><ColumnDefinition Width="36" /><ColumnDefinition Width="42" /></Grid.ColumnDefinitions>
                                                     <Grid Width="48" Height="48">
                                                         <Ellipse Fill="#273044" />
                                                         <TextBlock Style="{StaticResource InitialFallbackText}" Text="{Binding Initials}" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="18" FontWeight="SemiBold" />
                                                         <Image Source="{Binding ExpandedIconSource}" Width="46" Height="46" />
+                                                        <Border Width="4" Height="48" HorizontalAlignment="Left" CornerRadius="2" Background="{Binding AccentBrush}" Margin="-8,0,0,0" IsHitTestVisible="False" />
                                                     </Grid>
                                                     <StackPanel Grid.Column="1" Margin="10,0,8,0" VerticalAlignment="Center">
                                                         <TextBlock Text="{Binding ApplicationName}" FontFamily="Segoe UI Variable Display" FontSize="18" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
@@ -605,7 +662,30 @@
                                                             <TextBlock Text="{Binding StatusText}" FontSize="11" FontWeight="Bold" Foreground="#28D99A" />
                                                         </StackPanel>
                                                     </StackPanel>
-                                                    <Button Grid.Column="2" Style="{StaticResource SurfaceButton}" Width="40" Height="40" Padding="0" Command="{Binding ToggleExpandedCommand}" ToolTip="Recolher canal">
+                                                    <Button Grid.Column="2" Style="{StaticResource SurfaceButton}" Width="34" Height="40" Padding="0" Command="{Binding MoveEarlierCommand}" ToolTip="Mover para cima" AutomationProperties.Name="Mover canal para cima">
+                                                        <TextBlock FontFamily="Segoe MDL2 Assets" FontSize="12" Text="&#xE74A;" />
+                                                    </Button>
+                                                    <Button Grid.Column="3" Style="{StaticResource SurfaceButton}" Width="34" Height="40" Padding="0" Command="{Binding MoveLaterCommand}" ToolTip="Mover para baixo" AutomationProperties.Name="Mover canal para baixo">
+                                                        <TextBlock FontFamily="Segoe MDL2 Assets" FontSize="12" Text="&#xE74B;" />
+                                                    </Button>
+                                                    <Button Grid.Column="4" Style="{StaticResource SurfaceButton}" Width="34" Height="40" Padding="0" Command="{Binding CycleAccentCommand}" ToolTip="Alternar cor do canal" AutomationProperties.Name="Alternar cor do canal">
+                                                        <Border Width="14" Height="14" CornerRadius="7" Background="{Binding AccentBrush}" />
+                                                    </Button>
+                                                    <Button Grid.Column="5" Style="{StaticResource SurfaceButton}" Width="34" Height="40" Padding="0" Command="{Binding TogglePinCommand}" ToolTip="{Binding PinActionText}" AutomationProperties.Name="{Binding PinActionText}">
+                                                        <TextBlock FontFamily="Segoe MDL2 Assets" FontSize="13" Text="&#xE718;">
+                                                            <TextBlock.Style>
+                                                                <Style TargetType="TextBlock">
+                                                                    <Setter Property="Foreground" Value="#AAB5C7" />
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding IsPinned}" Value="True">
+                                                                            <Setter Property="Foreground" Value="#F0A202" />
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </TextBlock.Style>
+                                                        </TextBlock>
+                                                    </Button>
+                                                    <Button Grid.Column="6" Style="{StaticResource SurfaceButton}" Width="40" Height="40" Padding="0" Command="{Binding ToggleExpandedCommand}" ToolTip="Recolher canal">
                                                         <TextBlock FontFamily="Segoe MDL2 Assets" FontSize="13" Text="&#xE73F;" />
                                                     </Button>
                                                 </Grid>
@@ -653,10 +733,6 @@
                                                                         <Border Canvas.Left="25" Width="14" Background="{StaticResource FaderGradient}" CornerRadius="7">
                                                                             <Canvas.Top><MultiBinding Converter="{StaticResource VolumeToFaderPositionConverter}" ConverterParameter="FillTop"><Binding Path="TargetVolume" /><Binding ElementName="FaderCanvas" Path="ActualHeight" /></MultiBinding></Canvas.Top>
                                                                             <Border.Height><MultiBinding Converter="{StaticResource VolumeToFaderPositionConverter}" ConverterParameter="FillHeight"><Binding Path="TargetVolume" /><Binding ElementName="FaderCanvas" Path="ActualHeight" /></MultiBinding></Border.Height>
-                                                                        </Border>
-                                                                        <Border Canvas.Left="7" Width="50" Height="36" Background="#2A3344" BorderThickness="0" CornerRadius="18">
-                                                                            <Canvas.Top><MultiBinding Converter="{StaticResource VolumeToFaderPositionConverter}" ConverterParameter="KnobTop"><Binding Path="TargetVolume" /><Binding ElementName="FaderCanvas" Path="ActualHeight" /></MultiBinding></Canvas.Top>
-                                                                            <Border Width="28" Height="4" Background="{StaticResource BrandGradient}" CornerRadius="2" />
                                                                         </Border>
                                                                     </Canvas>
                                                                     <Slider Style="{StaticResource VerticalFader}" Height="{Binding ActualHeight, ElementName=FaderCanvas}" Width="64" Value="{Binding TargetVolume, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" HorizontalAlignment="Center" VerticalAlignment="Stretch" ToolTip="Volume do canal — use a roda do mouse para ajustar ±1%" IsEnabled="{Binding IsOnline}" PreviewMouseWheel="VolumeSlider_PreviewMouseWheel" ValueChanged="ChannelVolumeSlider_ValueChanged" />
@@ -786,7 +862,7 @@
                                 <Style TargetType="Border">
                                     <Setter Property="Visibility" Value="Collapsed" />
                                     <Style.Triggers>
-                                        <DataTrigger Binding="{Binding ExpandedChannels.Count}" Value="0">
+                                        <DataTrigger Binding="{Binding DisplayedExpandedChannels.Count}" Value="0">
                                             <Setter Property="Visibility" Value="Visible" />
                                         </DataTrigger>
                                     </Style.Triggers>
@@ -800,16 +876,71 @@
                     </Grid>
 
                     <!-- Barra inferior -->
-                    <Border Grid.Row="2" Background="#0E131C" BorderThickness="0" CornerRadius="15" Padding="10,5">
-                        <Grid>
+                    <Border Grid.Row="2" Background="#0E131C" BorderThickness="0" CornerRadius="12"
+                            Padding="8,4" MinHeight="40" ClipToBounds="False" SnapsToDevicePixels="True">
+                        <Grid ClipToBounds="False">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                            <StackPanel Orientation="Horizontal">
-                                <Border Width="165" Background="#151B27" BorderThickness="0" CornerRadius="10" Padding="12,5">
-                                    <StackPanel><TextBlock Text="PERFIL ATIVO" FontSize="9" Foreground="#697487" /><TextBlock Text="{Binding ProfileName}" FontSize="12" /></StackPanel>
-                                </Border>
-                            </StackPanel>
-                            <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center">
-                                <Button Style="{StaticResource SurfaceButton}" Foreground="#9B78FF" Content="⚛  MIXER" Margin="4,0" IsHitTestVisible="False" AutomationProperties.Name="Tela atual: mixer" />
+                            <Button Command="{Binding ToggleProfileFlyoutCommand}"
+                                    Cursor="Hand"
+                                    MinHeight="32"
+                                    VerticalAlignment="Center"
+                                    ClipToBounds="False"
+                                    ToolTip="Abrir gestão de perfis"
+                                    AutomationProperties.Name="Perfil ativo">
+                                <Button.Template>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border x:Name="ProfileChip"
+                                                MinWidth="200" MinHeight="32"
+                                                Background="#151B27"
+                                                BorderBrush="#2A3445"
+                                                BorderThickness="1"
+                                                CornerRadius="10"
+                                                Padding="12,4"
+                                                ClipToBounds="False"
+                                                SnapsToDevicePixels="True">
+                                            <Grid ClipToBounds="False">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel VerticalAlignment="Center" ClipToBounds="False">
+                                                    <TextBlock Text="{Binding ProfileName}"
+                                                               FontSize="13"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="#F5F7FB"
+                                                               LineHeight="16"
+                                                               TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Text="{Binding ProfileBindSummary}"
+                                                               FontSize="10"
+                                                               Foreground="#D0D6E0"
+                                                               Margin="0,1,0,0"
+                                                               LineHeight="12"
+                                                               TextTrimming="CharacterEllipsis" />
+                                                </StackPanel>
+                                                <TextBlock Grid.Column="1"
+                                                           FontFamily="Segoe MDL2 Assets"
+                                                           Text="&#xE70D;"
+                                                           FontSize="11"
+                                                           Foreground="#9AA5B8"
+                                                           VerticalAlignment="Center"
+                                                           Margin="10,0,0,0" />
+                                            </Grid>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="ProfileChip" Property="Background" Value="#1B2433" />
+                                                <Setter TargetName="ProfileChip" Property="BorderBrush" Value="#3A465C" />
+                                            </Trigger>
+                                            <DataTrigger Binding="{Binding IsProfileFlyoutOpen}" Value="True">
+                                                <Setter TargetName="ProfileChip" Property="BorderBrush" Value="#6F50E8" />
+                                                <Setter TargetName="ProfileChip" Property="Background" Value="#1A2030" />
+                                            </DataTrigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Button.Template>
+                            </Button>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <Button Style="{StaticResource SurfaceButton}" Foreground="#9B78FF" Content="⚛  MIXER" Margin="4,0" Padding="10,4" Height="28" IsHitTestVisible="False" AutomationProperties.Name="Tela atual: mixer" />
                             </StackPanel>
                         </Grid>
                     </Border>
@@ -924,13 +1055,14 @@
             </Grid>
 
             <Border x:Name="SettingsFlyout" Grid.RowSpan="2" Panel.ZIndex="50"
-                    Width="330" Margin="0,78,82,0" Padding="18"
+                    Width="340" Margin="0,78,82,0" Padding="18"
                     HorizontalAlignment="Right" VerticalAlignment="Top"
                     Background="#121823" BorderBrush="#30394A" BorderThickness="1"
-                    CornerRadius="17" Visibility="Collapsed">
+                    CornerRadius="17" Visibility="Collapsed" MaxHeight="640">
                 <Border.Effect>
                     <DropShadowEffect Color="#000000" BlurRadius="28" ShadowDepth="8" Opacity="0.65" />
                 </Border.Effect>
+                <ScrollViewer VerticalScrollBarVisibility="Auto" MaxHeight="600">
                 <StackPanel>
                     <Grid>
                         <TextBlock Text="C O N F I G U R A Ç Õ E S" FontSize="10" FontWeight="SemiBold" VerticalAlignment="Center" />
@@ -947,14 +1079,145 @@
                         </StackPanel>
                         <ToggleButton Grid.Column="1" Style="{StaticResource TogglePill}" IsChecked="{Binding IsSafetyEnabled}" />
                     </Grid>
+                    <Grid Margin="0,16,0,0">
+                        <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="Iniciar com o Windows" FontSize="12" FontWeight="SemiBold" />
+                            <TextBlock Text="Abre o Molecular automaticamente no login" FontSize="10" Foreground="#7F8A9D" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <ToggleButton Grid.Column="1" Style="{StaticResource TogglePill}" IsChecked="{Binding StartWithWindows}"
+                                      ToolTip="Iniciar com o Windows" AutomationProperties.Name="Iniciar com o Windows" />
+                    </Grid>
+                    <Grid Margin="0,16,0,0">
+                        <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="Fechar para a bandeja" FontSize="12" FontWeight="SemiBold" />
+                            <TextBlock Text="O botão fechar oculta na bandeja em vez de sair" FontSize="10" Foreground="#7F8A9D" Margin="0,4,0,0" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <ToggleButton Grid.Column="1" Style="{StaticResource TogglePill}" IsChecked="{Binding CloseToTray}"
+                                      ToolTip="Fechar para a bandeja" AutomationProperties.Name="Fechar para a bandeja" />
+                    </Grid>
+                    <Grid Margin="0,16,0,0">
+                        <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="Abrir na bandeja" FontSize="12" FontWeight="SemiBold" />
+                            <TextBlock Text="Inicia oculto na bandeja do Windows" FontSize="10" Foreground="#7F8A9D" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <ToggleButton Grid.Column="1" Style="{StaticResource TogglePill}" IsChecked="{Binding StartInTray}"
+                                      ToolTip="Abrir na bandeja" AutomationProperties.Name="Abrir na bandeja" />
+                    </Grid>
+                    <Grid Margin="0,16,0,0">
+                        <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="Fallback do dispositivo" FontSize="12" FontWeight="SemiBold" />
+                            <TextBlock Text="Se o dispositivo preferido sumir, usa o padrão do Windows" FontSize="10" Foreground="#7F8A9D" Margin="0,4,0,0" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <ToggleButton Grid.Column="1" Style="{StaticResource TogglePill}" IsChecked="{Binding PreferSystemDefaultFallback}"
+                                      ToolTip="Fallback para saída padrão" AutomationProperties.Name="Fallback do dispositivo preferido" />
+                    </Grid>
+                    <TextBlock Text="Frequência dos medidores" FontSize="12" FontWeight="SemiBold" Margin="0,16,0,8" />
+                    <ComboBox Height="40" Style="{StaticResource PillComboBox}"
+                              ItemsSource="{Binding MeterIntervalOptions}"
+                              SelectedItem="{Binding SelectedMeterInterval}"
+                              DisplayMemberPath="DisplayName"
+                              ToolTip="Frequência visual dos medidores com a janela aberta"
+                              AutomationProperties.Name="Frequência dos medidores" />
+                    <Grid Margin="0,16,0,0">
+                        <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="Busca automática de canais" FontSize="12" FontWeight="SemiBold" />
+                            <TextBlock Text="Neste perfil, adiciona apps de áudio novos ao detectar" FontSize="10" Foreground="#7F8A9D" Margin="0,4,0,0" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <ToggleButton Grid.Column="1" Style="{StaticResource TogglePill}" IsChecked="{Binding AutoDiscoverChannels}"
+                                      ToolTip="Ativar ou desativar busca automática neste perfil"
+                                      AutomationProperties.Name="Busca automática de canais do perfil ativo" />
+                    </Grid>
                     <Border Margin="0,16,0,0" Padding="13" Background="#0D121A" BorderBrush="#273142" BorderThickness="1" CornerRadius="12">
                         <StackPanel>
                             <TextBlock Text="DESEMPENHO" FontSize="9" Foreground="#AEB7C6" />
-                            <TextBlock Text="Modo otimizado ativo" FontSize="12" FontWeight="SemiBold" Margin="0,7,0,0" />
-                            <TextBlock Text="Leitura do áudio em segundo plano e medidores atualizados a cada 100 ms." FontSize="10" Foreground="#7F8A9D" TextWrapping="Wrap" LineHeight="16" Margin="0,5,0,0" />
+                            <TextBlock Text="{Binding MeterPerformanceSummary}" FontSize="12" FontWeight="SemiBold" Margin="0,7,0,0" TextWrapping="Wrap" />
+                            <TextBlock Text="O dispositivo preferido é o selecionado no cabeçalho. A frequência afeta só a janela aberta." FontSize="10" Foreground="#7F8A9D" TextWrapping="Wrap" LineHeight="16" Margin="0,5,0,0" />
                         </StackPanel>
                     </Border>
+                    <Button Margin="0,16,0,0" Height="40" Style="{StaticResource SurfaceButton}"
+                            Command="{Binding ExportDiagnosticsCommand}"
+                            Content="Exportar diagnóstico"
+                            ToolTip="Salva um relatório com versão, dispositivo, contagens e log recente (sem títulos de mídia)"
+                            AutomationProperties.Name="Exportar diagnóstico" />
                     <TextBlock Text="Molecular MVP 0.2.2" FontSize="9" Foreground="#687489" HorizontalAlignment="Right" Margin="0,14,0,0" />
+                </StackPanel>
+                </ScrollViewer>
+            </Border>
+
+            <Border Grid.RowSpan="2" Panel.ZIndex="55"
+                    Width="360" Margin="18,0,0,56" Padding="18"
+                    HorizontalAlignment="Left" VerticalAlignment="Bottom"
+                    Background="#121823" BorderBrush="#30394A" BorderThickness="1" CornerRadius="17">
+                <Border.Style>
+                    <Style TargetType="Border">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsProfileFlyoutOpen}" Value="True">
+                                <Setter Property="Visibility" Value="Visible" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
+                <Border.Effect>
+                    <DropShadowEffect Color="#000000" BlurRadius="28" ShadowDepth="8" Opacity="0.65" />
+                </Border.Effect>
+                <StackPanel>
+                    <Grid>
+                        <TextBlock Text="PERFIS" FontSize="12" FontWeight="Bold" VerticalAlignment="Center" />
+                        <Button HorizontalAlignment="Right" Style="{StaticResource WindowButton}" Width="32" Height="32" Padding="0"
+                                Command="{Binding ToggleProfileFlyoutCommand}" ToolTip="Fechar perfis">
+                            <TextBlock FontFamily="Segoe MDL2 Assets" FontSize="12" Text="&#xE711;" />
+                        </Button>
+                    </Grid>
+                    <TextBlock Text="Perfil ativo" FontSize="11" Foreground="#B4BCC9" Margin="0,14,0,8" />
+                    <ComboBox Height="40" Style="{StaticResource PillComboBox}" MaxDropDownHeight="180"
+                              ItemsSource="{Binding AvailableProfiles}"
+                              SelectedItem="{Binding SelectedProfileItem}"
+                              DisplayMemberPath="DisplayName"
+                              ToolTip="Trocar perfil ativo" />
+                    <TextBlock Text="Nome" FontSize="11" Foreground="#B4BCC9" Margin="0,16,0,8" />
+                    <TextBox Text="{Binding ProfileName, UpdateSourceTrigger=LostFocus}" Height="38" Padding="12,10"
+                             Background="#151C28" Foreground="#F2F5FA" BorderBrush="#3A465C" BorderThickness="1"
+                             CaretBrush="White" FontSize="13" IsEnabled="{Binding CanManageActiveProfile}" />
+                    <TextBlock Text="Atrelar a aplicativo" FontSize="11" Foreground="#B4BCC9" Margin="0,16,0,8" />
+                    <ComboBox Height="40" Style="{StaticResource PillComboBox}" MaxDropDownHeight="180"
+                              ItemsSource="{Binding BindOptions}"
+                              SelectedItem="{Binding SelectedBindOption}"
+                              DisplayMemberPath="DisplayName"
+                              IsEnabled="{Binding CanManageActiveProfile}"
+                              ToolTip="Quando este app abrir, o perfil é ativado; ao fechar, volta o padrão" />
+                    <TextBlock Text="{Binding ProfileBindSummary}" FontSize="11" Foreground="#D0D6E0" Margin="0,10,0,0" TextWrapping="Wrap" LineHeight="16" />
+                    <Grid Margin="0,16,0,0">
+                        <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="Busca automática" FontSize="12" FontWeight="SemiBold" />
+                            <TextBlock Text="Adiciona canais novos neste perfil" FontSize="10" Foreground="#7F8A9D" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <ToggleButton Grid.Column="1" Style="{StaticResource TogglePill}" IsChecked="{Binding AutoDiscoverChannels}"
+                                      IsEnabled="{Binding CanManageActiveProfile}"
+                                      ToolTip="Busca automática de canais neste perfil"
+                                      AutomationProperties.Name="Busca automática de canais" />
+                    </Grid>
+                    <WrapPanel Margin="0,16,0,0">
+                        <Button Style="{StaticResource SurfaceButton}" Margin="0,0,8,8" Padding="12,8"
+                                Command="{Binding CreateProfileCommand}" Content="Novo" />
+                        <Button Style="{StaticResource SurfaceButton}" Margin="0,0,8,8" Padding="12,8"
+                                Command="{Binding DuplicateProfileCommand}" Content="Duplicar" />
+                        <Button Style="{StaticResource SurfaceButton}" Margin="0,0,8,8" Padding="12,8"
+                                Command="{Binding SetDefaultProfileCommand}" Content="Tornar padrão" />
+                        <Button Style="{StaticResource SurfaceButton}" Margin="0,0,8,8" Padding="12,8"
+                                Command="{Binding ExportProfileCommand}" Content="Exportar" ToolTip="Exportar perfil ativo sem dados sensíveis" />
+                        <Button Style="{StaticResource SurfaceButton}" Margin="0,0,8,8" Padding="12,8"
+                                Command="{Binding ImportProfileCommand}" Content="Importar" ToolTip="Importar perfil de arquivo" />
+                        <Button Style="{StaticResource SurfaceButton}" Margin="0,0,0,8" Padding="12,8"
+                                Command="{Binding DeleteProfileCommand}" Content="Excluir" Foreground="#FFB4C3"
+                                ToolTip="Exclui o perfil ativo. Também é possível escolher 'Sem perfil' na lista." />
+                    </WrapPanel>
                 </StackPanel>
             </Border>
         </Grid>

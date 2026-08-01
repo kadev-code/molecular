@@ -23,7 +23,9 @@ public sealed class ExpandedCardHeightConverter : IValueConverter
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
     {
         var viewportHeight = value is double number ? number : 0;
-        return Math.Clamp(viewportHeight - 14, 398, 460);
+        // Leave room for card margin so the expanded section fits without a scrollbar
+        // at the default window size.
+        return Math.Clamp(viewportHeight - 20, 380, 450);
     }
 
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>

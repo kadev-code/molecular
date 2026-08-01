@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.IO;
@@ -16,6 +17,8 @@ public sealed class ChannelViewModel : ObservableObject
     private readonly Action<ChannelViewModel> _viewModeChanged;
     private readonly Action<ChannelViewModel, MediaTransportAction> _mediaAction;
     private readonly Action<ChannelViewModel> _removeRequested;
+    private readonly Action<ChannelViewModel, int> _moveRequested;
+    private readonly Action<ChannelViewModel> _pinChanged;
     private AudioApplicationViewModel? _selectedApplication;
     private string _applicationName;
     private string _executableName;
@@ -35,6 +38,8 @@ public sealed class ChannelViewModel : ObservableObject
     private double _mediaBackdropImageOpacity;
     private string? _mediaThumbnailKey;
     private DateTime _lastAudioActivityAt = DateTime.MinValue;
+    private Brush? _accentBrush;
+    private string? _accentBrushKey;
 
     public ChannelViewModel(
         ChannelBinding binding,
@@ -42,13 +47,17 @@ public sealed class ChannelViewModel : ObservableObject
         Action<ChannelViewModel> changed,
         Action<ChannelViewModel> viewModeChanged,
         Action<ChannelViewModel, MediaTransportAction> mediaAction,
-        Action<ChannelViewModel> removeRequested)
+        Action<ChannelViewModel> removeRequested,
+        Action<ChannelViewModel, int> moveRequested,
+        Action<ChannelViewModel> pinChanged)
     {
         _binding = binding;
         _changed = changed;
         _viewModeChanged = viewModeChanged;
         _mediaAction = mediaAction;
         _removeRequested = removeRequested;
+        _moveRequested = moveRequested;
+        _pinChanged = pinChanged;
         AvailableApplications = availableApplications;
         AssignmentOptions = new ObservableCollection<AudioApplicationViewModel>();
         _applicationName = binding.ApplicationName ?? "Canal não atribuído";
@@ -63,8 +72,12 @@ public sealed class ChannelViewModel : ObservableObject
         _isSolo = binding.IsSolo;
         ToggleMuteCommand = new RelayCommand(() => IsMuted = !IsMuted);
         ToggleSoloCommand = new RelayCommand(() => IsSolo = !IsSolo);
-        ToggleExpandedCommand = new RelayCommand(ToggleExpanded);
+        ToggleExpandedCommand = new RelayCommand(ToggleExpanded, () => !IsPinned);
         ToggleHiddenCommand = new RelayCommand(ToggleHidden);
+        TogglePinCommand = new RelayCommand(TogglePin);
+        CycleAccentCommand = new RelayCommand(CycleAccent);
+        MoveEarlierCommand = new RelayCommand(() => _moveRequested(this, -1));
+        MoveLaterCommand = new RelayCommand(() => _moveRequested(this, 1));
         ClearCommand = new RelayCommand(ClearAssignment);
         ResetVolumeCommand = new RelayCommand(() => TargetVolume = 100);
         RemoveCommand = new RelayCommand(() => _removeRequested(this));
@@ -100,14 +113,72 @@ public sealed class ChannelViewModel : ObservableObject
     public bool IsDisconnected => IsAssigned && !IsOnline;
     public bool IsExpanded => string.Equals(_binding.ViewMode, "expanded", StringComparison.OrdinalIgnoreCase);
     public bool IsHidden => _binding.IsHidden;
+    public bool IsPinned => _binding.IsPinned;
     public string Accent => _binding.AccentColor ?? "#7B5CFF";
+    public Brush AccentBrush
+    {
+        get
+        {
+            var key = Accent;
+            if (_accentBrush is not null && string.Equals(_accentBrushKey, key, StringComparison.OrdinalIgnoreCase))
+                return _accentBrush;
+
+            _accentBrushKey = key;
+            _accentBrush = ResolveAccentBrush(key);
+            return _accentBrush;
+        }
+    }
+
+    private static readonly Dictionary<string, Brush> AccentBrushCache = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly Brush DefaultAccentBrush = CreateFrozenBrush(Color.FromRgb(123, 92, 255));
+
+    private static Brush ResolveAccentBrush(string accent)
+    {
+        lock (AccentBrushCache)
+        {
+            if (AccentBrushCache.TryGetValue(accent, out var cached))
+                return cached;
+        }
+
+        Brush brush;
+        try
+        {
+            brush = (Brush)new BrushConverter().ConvertFromString(accent)!;
+            if (brush.CanFreeze) brush.Freeze();
+        }
+        catch
+        {
+            brush = DefaultAccentBrush;
+        }
+
+        lock (AccentBrushCache)
+        {
+            AccentBrushCache[accent] = brush;
+        }
+
+        return brush;
+    }
+
+    private static Brush CreateFrozenBrush(Color color)
+    {
+        var brush = new SolidColorBrush(color);
+        brush.Freeze();
+        return brush;
+    }
     public string StatusText => !IsAssigned
         ? "Selecione um aplicativo"
         : IsOnline
             ? (IsMediaPlaying || HasAudioActivity ? "Reproduzindo áudio" : "Sem atividade")
             : "Aguardando reconexão…";
-    public string QuickStatusText => IsHidden ? "OCULTO" : !IsAssigned ? "Clique para atribuir" : IsOnline ? "ATIVO" : "DESCONECTADO";
+    public string QuickStatusText => IsHidden
+        ? "OCULTO"
+        : IsPinned
+            ? "FIXADO"
+            : !IsAssigned
+                ? "Clique para atribuir"
+                : IsOnline ? "ATIVO" : "DESCONECTADO";
     public string HideActionText => IsHidden ? "Mostrar canal" : "Ocultar canal";
+    public string PinActionText => IsPinned ? "Desafixar canal" : "Fixar canal";
     public string VolumeDisplayText => IsOnline ? $"{TargetVolume:0}%" : "—";
     public bool HasMediaSession => _mediaSession is not null;
     public ImageSource? MediaThumbnailSource => _mediaThumbnailSource;
@@ -228,6 +299,10 @@ public sealed class ChannelViewModel : ObservableObject
     public RelayCommand ToggleSoloCommand { get; }
     public RelayCommand ToggleExpandedCommand { get; }
     public RelayCommand ToggleHiddenCommand { get; }
+    public RelayCommand TogglePinCommand { get; }
+    public RelayCommand CycleAccentCommand { get; }
+    public RelayCommand MoveEarlierCommand { get; }
+    public RelayCommand MoveLaterCommand { get; }
     public RelayCommand ClearCommand { get; }
     public RelayCommand ResetVolumeCommand { get; }
     public RelayCommand RemoveCommand { get; }
@@ -280,7 +355,7 @@ public sealed class ChannelViewModel : ObservableObject
             var thumbnail = LoadThumbnail(mediaSession?.ThumbnailBytes);
             _mediaThumbnailSource = thumbnail?.Image;
             _mediaBackdropBrush = thumbnail?.BackdropBrush ?? CreateDefaultMediaBackdrop();
-            _mediaBackdropImageOpacity = thumbnail?.CanFillBackdrop == true ? 0.2 : 0;
+            _mediaBackdropImageOpacity = thumbnail?.CanFillBackdrop == true ? 0.6 : 0;
             OnPropertyChanged(nameof(MediaThumbnailSource));
             OnPropertyChanged(nameof(HasMediaThumbnail));
             OnPropertyChanged(nameof(MediaBackdropBrush));
@@ -303,6 +378,7 @@ public sealed class ChannelViewModel : ObservableObject
 
     public void SetExpanded(bool expanded)
     {
+        if (!expanded && IsPinned) return;
         var next = expanded ? "expanded" : "collapsed";
         if (string.Equals(_binding.ViewMode, next, StringComparison.OrdinalIgnoreCase)) return;
         _binding.ViewMode = next;
@@ -316,10 +392,40 @@ public sealed class ChannelViewModel : ObservableObject
     private void ToggleHidden()
     {
         _binding.IsHidden = !_binding.IsHidden;
-        if (_binding.IsHidden) SetExpanded(false);
+        if (_binding.IsHidden && !IsPinned) SetExpanded(false);
         OnPropertyChanged(nameof(IsHidden));
         OnPropertyChanged(nameof(HideActionText));
         OnPropertyChanged(nameof(QuickStatusText));
+        _changed(this);
+    }
+
+    private void TogglePin()
+    {
+        _binding.IsPinned = !_binding.IsPinned;
+        if (_binding.IsPinned)
+        {
+            _binding.IsHidden = false;
+            _binding.ViewMode = "expanded";
+        }
+
+        OnPropertyChanged(nameof(IsPinned));
+        OnPropertyChanged(nameof(PinActionText));
+        OnPropertyChanged(nameof(IsHidden));
+        OnPropertyChanged(nameof(HideActionText));
+        OnPropertyChanged(nameof(IsExpanded));
+        OnPropertyChanged(nameof(QuickStatusText));
+        ToggleExpandedCommand.RaiseCanExecuteChanged();
+        _pinChanged(this);
+        _changed(this);
+    }
+
+    private void CycleAccent()
+    {
+        MixerChannelRegistry.CycleAccent(_binding);
+        _accentBrush = null;
+        _accentBrushKey = null;
+        OnPropertyChanged(nameof(Accent));
+        OnPropertyChanged(nameof(AccentBrush));
         _changed(this);
     }
 
